@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Unicorn Icebreaker Generator 🦄
 
-## Getting Started
+Eine AI-gestützte Web-App für Cold Outreach Automation. Generiert personalisierte Icebreaker basierend auf Website-Analysen (Perplexity) und sendet Leads direkt in Lemlist-Kampagnen.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+*   **CSV Import:** Upload von Apollo-Exporten (automatische Spalten-Erkennung).
+*   **Smart Filtering:**
+    *   Filtert Leads ohne Website.
+    *   Filtert Leads auf der Opt-Out Liste (Google Sheet).
+*   **AI Icebreaker:**
+    *   **Perplexity:** Scrapt und fasst die Website des Leads zusammen.
+    *   **Gemini 3.0 Flash:** Generiert charmante Icebreaker basierend auf der Zusammenfassung.
+*   **Bulk Processing:** Verarbeitet tausende Leads im Hintergrund mit Fortschrittsanzeige.
+*   **Lemlist Integration:**
+    *   Erstellt automatisch Kampagnen.
+    *   Fügt Leads hinzu (auch wenn sie bereits existieren).
+    *   Übergibt den generierten Icebreaker als Variable.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+*   **Frontend:** Next.js 14 (App Router), Tailwind CSS, shadcn/ui
+*   **Backend/DB:** Supabase (PostgreSQL)
+*   **AI:** OpenRouter (Perplexity + Google Gemini)
+*   **Email:** Lemlist API v2
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment auf Vercel
 
-## Learn More
+1.  **Repository pushen:** Lade diesen Code auf GitHub hoch.
+2.  **Neues Projekt in Vercel:** Importiere das Repository.
+3.  **Environment Variables:** Füge folgende Umgebungsvariablen in den Vercel-Einstellungen hinzu:
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Beschreibung |
+| :--- | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Deine Supabase Projekt-URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Dein Supabase Anon/Public Key |
+| `OPENROUTER_API_KEY` | API Key für OpenRouter (Perplexity/Gemini) |
+| `LEMLIST_API_KEY` | API Key für Lemlist |
+| `SITE_URL` | Die URL deiner Vercel-App (z.B. `https://dein-projekt.vercel.app`) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  **Deployen:** Klicke auf "Deploy".
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Lokale Entwicklung
 
-## Deploy on Vercel
+1.  Dependencies installieren:
+    ```bash
+    npm install
+    ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2.  `.env.local` Datei erstellen (siehe oben).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3.  Server starten:
+    ```bash
+    npm run dev
+    ```
