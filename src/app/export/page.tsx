@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Lead } from '@/types/database';
 
 import { useSearchParams } from 'next/navigation';
 
-export default function ExportPage() {
+function ExportContent() {
   const searchParams = useSearchParams();
   const listNameParam = searchParams.get('list');
   
@@ -288,5 +288,13 @@ export default function ExportPage() {
 
       </main>
     </div>
+  );
+}
+
+export default function ExportPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Lade Export...</div>}>
+      <ExportContent />
+    </Suspense>
   );
 }
