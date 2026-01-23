@@ -39,7 +39,7 @@ export default function Home() {
              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">AI Cold Outreach v1.0</span>
           </div>
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            Unicorn <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Icebreaker</span> Generator
+            Unicorn <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Icebreaker</span>
           </h1>
         </header>
 
