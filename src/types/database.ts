@@ -18,7 +18,8 @@ export type Settings = {
   id: string;
   created_at: string;
   icebreaker_prompt: string | null;
-  last_used_template_id: string | null; // New field
+  last_used_template_id: string | null;
+  selected_model: string | null; // New field
 };
 
 export type PromptTemplate = {

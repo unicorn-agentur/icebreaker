@@ -4,7 +4,7 @@ import { scrapeWebsite, generateIcebreaker } from '@/lib/openrouter';
 
 export async function POST(request: Request) {
   try {
-    const { lead, prompt } = await request.json();
+    const { lead, prompt, model } = await request.json();
 
     if (!lead || !prompt) {
       return NextResponse.json({ success: false, error: 'Missing lead or prompt' }, { status: 400 });
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const summary = await scrapeWebsite(lead.website);
     
     // 2. Generate Icebreaker (Gemini)
-    const icebreaker = await generateIcebreaker(prompt, lead, summary);
+    const icebreaker = await generateIcebreaker(prompt, lead, summary, model);
 
     // 3. Update Database
     const { error } = await supabase

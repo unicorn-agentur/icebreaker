@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle } from 'lucide-react';
 import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
@@ -30,6 +30,7 @@ export default function IcebreakerPage() {
   const [bulkProcessedCount, setBulkProcessedCount] = useState(0);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
+  const shouldStopRef = useRef(false);
   const router = useRouter();
 
   const [currentListName, setCurrentListName] = useState<string>('');
@@ -229,6 +230,7 @@ export default function IcebreakerPage() {
       setBulkProgress(0);
       setBulkProcessedCount(0);
       setBulkError(null);
+      shouldStopRef.current = false;
       await saveSettings();
 
       let processed = 0;
@@ -237,6 +239,11 @@ export default function IcebreakerPage() {
       
       try {
           while (true) {
+              if (shouldStopRef.current) {
+                  setBulkProcessing(false);
+                  break;
+              }
+
               const { data: batch, error } = await supabase
                   .from('leads')
                   .select('*')
@@ -245,6 +252,12 @@ export default function IcebreakerPage() {
 
               if (error) throw error;
               if (!batch || batch.length === 0) break;
+
+              // Check again before processing batch
+              if (shouldStopRef.current) {
+                  setBulkProcessing(false);
+                  break;
+              }
 
               await Promise.all(batch.map(lead => processSingleLead(lead)));
 
@@ -259,7 +272,9 @@ export default function IcebreakerPage() {
               setEstimatedTimeRemaining(Math.ceil(remainingMs / 60000)); 
           }
 
-          router.push(`/export?list=${encodeURIComponent(currentListName)}`);
+          if (!shouldStopRef.current) {
+             router.push(`/export?list=${encodeURIComponent(currentListName)}`);
+          }
 
       } catch (err: any) {
           console.error("Bulk Error", err);
@@ -267,6 +282,10 @@ export default function IcebreakerPage() {
           setBulkProcessing(false);
           fetchData(); 
       }
+  };
+
+  const stopBulkProcessing = () => {
+      shouldStopRef.current = true;
   };
 
   const insertVariable = (variable: string) => {
@@ -325,6 +344,15 @@ export default function IcebreakerPage() {
                            </div>
                            <Progress value={bulkProgress} className="h-2" />
                        </div>
+                       <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           onClick={stopBulkProcessing}
+                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                           title="Pausieren"
+                       >
+                           <PauseCircle className="w-5 h-5" />
+                       </Button>
                    </div>
                ) : (
                    totalPending > 0 && (

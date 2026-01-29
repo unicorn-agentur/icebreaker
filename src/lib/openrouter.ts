@@ -41,8 +41,9 @@ export async function scrapeWebsite(url: string): Promise<string> {
   }
 }
 
-export async function generateIcebreaker(prompt: string, leadData: any, scrapeSummary: string): Promise<string> {
+export async function generateIcebreaker(prompt: string, leadData: any, scrapeSummary: string, model: string = "google/gemini-3-flash-preview"): Promise<string> {
   console.log("--- Generating Icebreaker ---");
+  console.log("Model:", model);
   console.log("Lead Data:", JSON.stringify(leadData, null, 2));
   console.log("Original Prompt:", prompt);
 
@@ -78,7 +79,7 @@ export async function generateIcebreaker(prompt: string, leadData: any, scrapeSu
     const response = await axios.post(
       SITE_URL,
       {
-        model: "google/gemini-3-flash-preview",
+        model: model,
         messages: [
           {
             role: "system",
