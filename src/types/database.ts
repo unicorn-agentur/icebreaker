@@ -11,11 +11,18 @@ export type Lead = {
   scrape_summary: string | null;
   icebreaker: string | null;
   error_message: string | null;
-  list_name: string | null; // New field
+  list_name: string | null;
 };
 
 export type Settings = {
   id: string;
   created_at: string;
   icebreaker_prompt: string | null;
+};
+
+export type PromptTemplate = {
+  id: string;
+  created_at: string;
+  name: string;
+  content: string;
 };
