@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle, Filter } from 'lucide-react';
 import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
@@ -33,19 +33,61 @@ export default function IcebreakerPage() {
   const shouldStopRef = useRef(false);
   const router = useRouter();
 
+  const [availableLists, setAvailableLists] = useState<string[]>([]);
+  const [selectedList, setSelectedList] = useState<string>('');
   const [currentListName, setCurrentListName] = useState<string>('');
 
   useEffect(() => {
-    fetchData();
-    fetchTemplates();
+    fetchLists().then(() => {
+        fetchTemplates();
+    });
   }, []);
+
+  useEffect(() => {
+      if (selectedList) {
+          fetchData();
+      }
+  }, [selectedList]);
+
+  const fetchLists = async () => {
+      // Fetch distinct list names. 
+      // Note: For large datasets, this should be an RPC or optimized query. 
+      // For now, we fetch list_name column and dedupe client-side.
+      const { data } = await supabase
+          .from('leads')
+          .select('list_name')
+          .not('list_name', 'is', null);
+      
+      if (data) {
+          const uniqueLists = Array.from(new Set(data.map(l => l.list_name).filter(Boolean))) as string[];
+          setAvailableLists(uniqueLists);
+          
+          // Default to most recent list if not set
+          if (!selectedList && uniqueLists.length > 0) {
+               const { data: recent } = await supabase
+                  .from('leads')
+                  .select('list_name')
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .single();
+               
+               if (recent?.list_name) {
+                   setSelectedList(recent.list_name);
+                   setCurrentListName(recent.list_name);
+               } else {
+                   setSelectedList(uniqueLists[0]);
+                   setCurrentListName(uniqueLists[0]);
+               }
+          }
+      }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     
-    // 1. Load Templates first
-    const { data: templatesData } = await supabase.from('prompt_templates').select('*').order('created_at', { ascending: false });
-    if (templatesData) setTemplates(templatesData);
+    // 1. Load Templates (already loaded in initial effect, but okay to refresh)
+    // const { data: templatesData } = await supabase.from('prompt_templates').select('*').order('created_at', { ascending: false });
+    // if (templatesData) setTemplates(templatesData);
 
     // 2. Fetch Settings (Prompt & Last Template)
     const { data: settings } = await supabase.from('settings').select('icebreaker_prompt, last_used_template_id').single();
@@ -62,14 +104,20 @@ export default function IcebreakerPage() {
         setPrompt("Erstelle einen kurzen, charmanten Icebreaker für eine Cold Email an {{firstName}} von {{companyName}}. Beziehe dich auf ihre Website und erwähne etwas Spezifisches aus der Recherche. Halte es unter 30 Wörtern. Du bist Dennis von der Unicorn Agentur.");
     }
 
-    // 3. Fetch FIRST 3 Pending Leads
+    // 3. Fetch FIRST 3 Pending Leads for Selected List
     await fetchTestLeads();
 
-    // 4. Count total pending leads
-    const { count } = await supabase
+    // 4. Count total pending leads for Selected List
+    let countQuery = supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
+    
+    if (selectedList) {
+        countQuery = countQuery.eq('list_name', selectedList);
+    }
+
+    const { count } = await countQuery;
     
     if (count !== null) {
         setTotalPending(count);
@@ -82,34 +130,32 @@ export default function IcebreakerPage() {
       let query = supabase
         .from('leads')
         .select('*')
-        .eq('status', 'pending')
-        .limit(3);
+        .eq('status', 'pending');
+      
+      if (selectedList) {
+          query = query.eq('list_name', selectedList);
+      }
 
       if (random) {
-          // Supabase doesn't support random() easily in JS client without RPC, 
-          // so we fetch a range and pick random in JS for simplicity or just offset
-          // For now, let's just fetch the next 3 by offset if we could track it, 
-          // or just fetch 20 and pick 3 random.
-          const { data: allPending } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('status', 'pending')
-            .limit(50);
+          // Fetch a larger batch to pick random from
+          const { data: allPending } = await query.limit(50);
             
           if (allPending && allPending.length > 0) {
               const shuffled = allPending.sort(() => 0.5 - Math.random());
               const selected = shuffled.slice(0, 3);
               setLeads(selected);
-              if (selected[0]?.list_name) setCurrentListName(selected[0].list_name);
               // Clear previous results when switching leads
               setTestResults({});
+          } else {
+              setLeads([]);
           }
       } else {
           // Default: First 3
-          const { data: firstLeads } = await query.order('created_at', { ascending: true });
+          const { data: firstLeads } = await query.order('created_at', { ascending: true }).limit(3);
           if (firstLeads && firstLeads.length > 0) {
             setLeads(firstLeads);
-            if (firstLeads[0].list_name) setCurrentListName(firstLeads[0].list_name);
+          } else {
+            setLeads([]);
           }
       }
   };
@@ -248,6 +294,7 @@ export default function IcebreakerPage() {
                   .from('leads')
                   .select('*')
                   .eq('status', 'pending')
+                  .eq('list_name', selectedList) // Ensure we only process the selected list
                   .limit(batchSize);
 
               if (error) throw error;
@@ -273,7 +320,7 @@ export default function IcebreakerPage() {
           }
 
           if (!shouldStopRef.current) {
-             router.push(`/export?list=${encodeURIComponent(currentListName)}`);
+             router.push(`/export?list=${encodeURIComponent(selectedList)}`);
           }
 
       } catch (err: any) {
@@ -308,7 +355,7 @@ export default function IcebreakerPage() {
         <StepNavigation />
 
         {/* Header */}
-        <header className="flex justify-between items-center pb-6 border-b border-gray-200 dark:border-gray-800">
+        <header className="flex flex-col md:flex-row md:justify-between md:items-center pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
           <div className="flex items-center gap-4">
             <Link href="/">
                 <Button variant="ghost" size="icon" className="rounded-full">
@@ -325,10 +372,32 @@ export default function IcebreakerPage() {
             </div>
           </div>
           
-          {/* Bulk Action Area */}
-          <div className="flex items-center gap-4">
+          {/* List Selector & Bulk Action Area */}
+          <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+               
+               {/* List Selector */}
+               <div className="relative">
+                   <div className="absolute left-3 top-2.5 pointer-events-none text-muted-foreground">
+                       <Filter className="w-4 h-4" />
+                   </div>
+                   <select 
+                       className="h-10 pl-9 pr-8 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-w-[200px]"
+                       value={selectedList}
+                       onChange={(e) => {
+                           setSelectedList(e.target.value);
+                           setCurrentListName(e.target.value);
+                       }}
+                       disabled={bulkProcessing || generating}
+                   >
+                       <option value="" disabled>Liste wählen...</option>
+                       {availableLists.map(list => (
+                           <option key={list} value={list}>{list}</option>
+                       ))}
+                   </select>
+               </div>
+
                {leads.some(l => l.status === 'generated') && !bulkProcessing && (
-                   <Link href={`/export?list=${encodeURIComponent(currentListName)}`}>
+                   <Link href={`/export?list=${encodeURIComponent(selectedList)}`}>
                        <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
                            Weiter zum Export <ArrowRight className="w-4 h-4 ml-2" />
                        </Button>
