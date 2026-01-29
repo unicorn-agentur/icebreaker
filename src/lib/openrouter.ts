@@ -16,7 +16,7 @@ export async function scrapeWebsite(url: string): Promise<string> {
     const response = await axios.post(
       SITE_URL,
       {
-        model: "perplexity/sonar-reasoning-pro",
+        model: "perplexity/sonar",
         messages: [
           {
             role: "user",
