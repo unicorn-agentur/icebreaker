@@ -5,11 +5,12 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2 } from 'lucide-react';
-import { Lead, PromptTemplate } from '@/types/database';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, LayoutTemplate } from 'lucide-react';
+import { Lead } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { TemplateManager } from '@/components/TemplateManager';
 
 export default function IcebreakerPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -18,11 +19,8 @@ export default function IcebreakerPage() {
   const [generating, setGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, { summary: string; icebreaker: string }>>({});
+  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   
-  // Templates State
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-
   // Bulk Processing State
   const [totalPending, setTotalPending] = useState(0);
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -36,7 +34,6 @@ export default function IcebreakerPage() {
 
   useEffect(() => {
     fetchData();
-    fetchTemplates();
   }, []);
 
   const fetchData = async () => {
@@ -77,11 +74,6 @@ export default function IcebreakerPage() {
     setLoading(false);
   };
 
-  const fetchTemplates = async () => {
-      const { data } = await supabase.from('prompt_templates').select('*').order('created_at', { ascending: false });
-      if (data) setTemplates(data);
-  };
-
   const savePrompt = async () => {
     await supabase.from('settings').update({ icebreaker_prompt: prompt }).neq('id', '00000000-0000-0000-0000-000000000000');
   };
@@ -90,41 +82,6 @@ export default function IcebreakerPage() {
     setIsSaving(true);
     await savePrompt();
     setTimeout(() => setIsSaving(false), 1500);
-  };
-
-  const handleSaveAsTemplate = async () => {
-      const name = window.prompt("Name für das neue Template:");
-      if (!name) return;
-
-      const { error } = await supabase.from('prompt_templates').insert({
-          name,
-          content: prompt
-      });
-
-      if (!error) {
-          fetchTemplates();
-          alert("Template gespeichert!");
-      } else {
-          alert("Fehler beim Speichern des Templates.");
-      }
-  };
-
-  const handleLoadTemplate = (templateId: string) => {
-      const template = templates.find(t => t.id === templateId);
-      if (template) {
-          setPrompt(template.content);
-          setSelectedTemplateId(templateId);
-      }
-  };
-
-  const handleDeleteTemplate = async (id: string) => {
-      if(!confirm("Template wirklich löschen?")) return;
-      
-      const { error } = await supabase.from('prompt_templates').delete().eq('id', id);
-      if (!error) {
-          fetchTemplates();
-          if (selectedTemplateId === id) setSelectedTemplateId('');
-      }
   };
 
   const runTest = async () => {
@@ -229,6 +186,13 @@ export default function IcebreakerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <TemplateManager 
+        isOpen={isTemplateManagerOpen} 
+        onClose={() => setIsTemplateManagerOpen(false)}
+        currentPrompt={prompt}
+        onLoadTemplate={(content) => setPrompt(content)}
+      />
+      
       <main className="max-w-7xl mx-auto space-y-8">
         
         <StepNavigation />
@@ -298,50 +262,33 @@ export default function IcebreakerPage() {
           {/* LEFT COLUMN: Prompt Editor (4 cols) */}
           <div className="xl:col-span-4 space-y-6">
             <Card className="sticky top-6 shadow-md">
-              <CardHeader className="bg-gray-50/50 dark:bg-gray-800/50 border-b pb-4 flex flex-col space-y-4">
-                <div className="flex flex-row items-center justify-between">
-                    <div className="space-y-1">
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <Bot className="w-5 h-5 text-primary" /> 
-                            Prompt Editor
-                        </CardTitle>
-                        <CardDescription>
-                        Definiere, wie Gemini den Icebreaker schreiben soll.
-                        </CardDescription>
-                    </div>
+              <CardHeader className="bg-gray-50/50 dark:bg-gray-800/50 border-b pb-4 flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <Bot className="w-5 h-5 text-primary" /> 
+                        Prompt Editor
+                    </CardTitle>
+                    <CardDescription>
+                    Definiere, wie Gemini den Icebreaker schreiben soll.
+                    </CardDescription>
+                </div>
+                <div className="flex gap-2">
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={handleSavePrompt} 
-                        disabled={isSaving || bulkProcessing}
-                        className={isSaving ? "text-green-600 border-green-200 bg-green-50" : ""}
+                        onClick={() => setIsTemplateManagerOpen(true)}
+                        className="gap-2"
                     >
-                        {isSaving ? <Check className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />}
-                        {isSaving ? 'Gespeichert' : 'Speichern'}
+                        <LayoutTemplate className="w-4 h-4" /> Vorlagen
                     </Button>
-                </div>
-
-                {/* Template Manager */}
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2">
-                        <select 
-                            className="flex-1 h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            onChange={(e) => handleLoadTemplate(e.target.value)}
-                            value={selectedTemplateId}
-                        >
-                            <option value="" disabled>Template laden...</option>
-                            {templates.map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                        </select>
-                        {selectedTemplateId && (
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDeleteTemplate(selectedTemplateId)}>
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                        )}
-                    </div>
-                    <Button variant="link" size="sm" className="px-0 text-xs text-primary h-auto mt-1" onClick={handleSaveAsTemplate}>
-                        + Aktuellen Prompt als Template speichern
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleSavePrompt} 
+                        title="Entwurf speichern"
+                        className={isSaving ? "text-green-600" : ""}
+                    >
+                        {isSaving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                     </Button>
                 </div>
               </CardHeader>

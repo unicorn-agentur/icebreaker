@@ -56,6 +56,7 @@ Das Projekt ist modern und serverless aufgebaut, um Kosten zu sparen und Wartung
     *   Erstellt automatisch Kampagnen.
     *   Fügt Leads hinzu (auch wenn sie bereits existieren).
     *   Übergibt den generierten Icebreaker als Variable `{{icebreaker}}`.
+*   **Prompt Templates:** Speichere und lade verschiedene Prompt-Strategien für unterschiedliche Zielgruppen.
 
 ## 💻 Tech Stack
 
@@ -79,6 +80,21 @@ Das Projekt ist modern und serverless aufgebaut, um Kosten zu sparen und Wartung
 | `SITE_URL` | Die URL deiner Vercel-App (z.B. `https://icebreaker-iota.vercel.app`) |
 
 4.  **Deployen:** Klicke auf "Deploy".
+
+## 📝 Datenbank Setup (Templates)
+
+Für die Template-Funktion muss einmalig folgendes SQL in Supabase ausgeführt werden:
+
+```sql
+create table if not exists public.prompt_templates (
+  id uuid default gen_random_uuid() primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  name text not null,
+  content text not null
+);
+alter table public.prompt_templates enable row level security;
+create policy "Enable all access for all users" on public.prompt_templates for all using (true) with check (true);
+```
 
 ## 👨‍💻 Lokale Entwicklung
 
