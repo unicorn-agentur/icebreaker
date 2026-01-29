@@ -25,11 +25,13 @@ export default function IcebreakerPage() {
   const [selectedModel, setSelectedModel] = useState<string>('google/gemini-3-flash-preview');
 
   const models = [
-      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
-      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
-      { id: 'openai/gpt-5.2', name: 'GPT 5.2' },
-      { id: 'openrouter/auto', name: 'OpenRouter Auto' },
+      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', costPerLead: 0.0007 },
+      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', costPerLead: 0.0032 },
+      { id: 'openai/gpt-5.2', name: 'GPT 5.2', costPerLead: 0.00315 },
+      { id: 'openrouter/auto', name: 'OpenRouter Auto', costPerLead: 0.002 }, // Estimate
   ];
+
+  const SEARCH_COST_PER_LEAD = 0.0055; // Perplexity Sonar estimate
 
   // Bulk Processing State
   const [totalPending, setTotalPending] = useState(0);
@@ -463,19 +465,30 @@ export default function IcebreakerPage() {
                    </div>
                ) : (
                    totalPending > 0 && (
-                        <div className="flex items-center gap-2">
-                             <div className="text-sm text-right mr-2 hidden sm:block">
-                                <div className="font-semibold">{totalPending} Leads</div>
-                                <div className="text-muted-foreground text-xs">warten auf Generierung</div>
+                        <div className="flex flex-col items-end gap-1">
+                             <div className="flex items-center gap-2">
+                                 <div className="text-sm text-right mr-2 hidden sm:block">
+                                    <div className="font-semibold">{totalPending} Leads</div>
+                                    <div className="text-muted-foreground text-xs">warten auf Generierung</div>
+                                 </div>
+                                 <Button 
+                                    onClick={startBulkProcessing}
+                                    disabled={generating}
+                                    className="bg-primary hover:bg-primary/90 text-white shadow-lg border-0"
+                                >
+                                    <Zap className="w-4 h-4 mr-2 fill-white text-white" />
+                                    Alle Generieren
+                                </Button>
                              </div>
-                             <Button 
-                                onClick={startBulkProcessing}
-                                disabled={generating}
-                                className="bg-primary hover:bg-primary/90 text-white shadow-lg border-0"
-                            >
-                                <Zap className="w-4 h-4 mr-2 fill-white text-white" />
-                                Alle Generieren
-                             </Button>
+                             
+                             {/* Cost Estimation */}
+                             <div className="text-[10px] text-muted-foreground flex items-center gap-1 bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded border border-gray-100 dark:border-gray-700">
+                                <span>Schätzung: ~${((SEARCH_COST_PER_LEAD + (models.find(m => m.id === selectedModel)?.costPerLead || 0)) * totalPending).toFixed(2)}</span>
+                                <span className="mx-1">•</span>
+                                <a href="https://openrouter.ai/credits" target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-0.5">
+                                    Credits aufladen <ArrowRight className="w-2 h-2" />
+                                </a>
+                             </div>
                         </div>
                    )
                )}
