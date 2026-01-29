@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle } from 'lucide-react';
 import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
@@ -36,6 +36,7 @@ export default function IcebreakerPage() {
 
   useEffect(() => {
     fetchData();
+    fetchTemplates();
   }, []);
 
   const fetchData = async () => {
@@ -61,19 +62,7 @@ export default function IcebreakerPage() {
     }
 
     // 3. Fetch FIRST 3 Pending Leads
-    const { data: firstLeads } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
-      .limit(3);
-    
-    if (firstLeads && firstLeads.length > 0) {
-      setLeads(firstLeads);
-      if (firstLeads[0].list_name) {
-          setCurrentListName(firstLeads[0].list_name);
-      }
-    }
+    await fetchTestLeads();
 
     // 4. Count total pending leads
     const { count } = await supabase
@@ -88,6 +77,51 @@ export default function IcebreakerPage() {
     setLoading(false);
   };
 
+  const fetchTestLeads = async (random = false) => {
+      let query = supabase
+        .from('leads')
+        .select('*')
+        .eq('status', 'pending')
+        .limit(3);
+
+      if (random) {
+          // Supabase doesn't support random() easily in JS client without RPC, 
+          // so we fetch a range and pick random in JS for simplicity or just offset
+          // For now, let's just fetch the next 3 by offset if we could track it, 
+          // or just fetch 20 and pick 3 random.
+          const { data: allPending } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('status', 'pending')
+            .limit(50);
+            
+          if (allPending && allPending.length > 0) {
+              const shuffled = allPending.sort(() => 0.5 - Math.random());
+              const selected = shuffled.slice(0, 3);
+              setLeads(selected);
+              if (selected[0]?.list_name) setCurrentListName(selected[0].list_name);
+              // Clear previous results when switching leads
+              setTestResults({});
+          }
+      } else {
+          // Default: First 3
+          const { data: firstLeads } = await query.order('created_at', { ascending: true });
+          if (firstLeads && firstLeads.length > 0) {
+            setLeads(firstLeads);
+            if (firstLeads[0].list_name) setCurrentListName(firstLeads[0].list_name);
+          }
+      }
+  };
+
+  const fetchTemplates = async () => {
+      const { data } = await supabase.from('prompt_templates').select('*').order('created_at', { ascending: false });
+      if (data) setTemplates(data);
+  };
+
+  const saveSettings = async () => {
+    await supabase.from('settings').update({ icebreaker_prompt: prompt }).neq('id', '00000000-0000-0000-0000-000000000000');
+  };
+
   // --- Template Logic ---
 
   const handleTemplateChange = async (templateId: string) => {
@@ -95,7 +129,6 @@ export default function IcebreakerPage() {
       const template = templates.find(t => t.id === templateId);
       if (template) {
           setPrompt(template.content);
-          // Save selection to settings
           await supabase.from('settings').update({ last_used_template_id: templateId }).neq('id', '00000000-0000-0000-0000-000000000000');
       }
   };
@@ -110,9 +143,7 @@ export default function IcebreakerPage() {
           .eq('id', selectedTemplateId);
       
       if (!error) {
-          // Update local state
           setTemplates(prev => prev.map(t => t.id === selectedTemplateId ? { ...t, content: prompt } : t));
-          // Also save as current draft
           await saveSettings();
       }
       setTimeout(() => setIsSaving(false), 1000);
@@ -132,7 +163,6 @@ export default function IcebreakerPage() {
       if (!error && data) {
           setTemplates([data, ...templates]);
           setSelectedTemplateId(data.id);
-          // Save as last used
           await supabase.from('settings').update({ last_used_template_id: data.id }).neq('id', '00000000-0000-0000-0000-000000000000');
       }
       setIsSaving(false);
@@ -149,8 +179,10 @@ export default function IcebreakerPage() {
       }
   };
 
-  const saveSettings = async () => {
-    await supabase.from('settings').update({ icebreaker_prompt: prompt }).neq('id', '00000000-0000-0000-0000-000000000000');
+  const handleSavePrompt = async () => {
+    setIsSaving(true);
+    await saveSettings();
+    setTimeout(() => setIsSaving(false), 1500);
   };
 
   // --- Processing Logic ---
@@ -439,6 +471,15 @@ export default function IcebreakerPage() {
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                     Test Leads <span className="text-sm font-normal text-muted-foreground bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{leads.length}</span>
                 </h2>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => fetchTestLeads(true)}
+                    disabled={generating || bulkProcessing}
+                    className="gap-2"
+                >
+                    <Shuffle className="w-4 h-4" /> Andere Leads testen
+                </Button>
             </div>
             
             {leads.length === 0 && !loading && (
