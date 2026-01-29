@@ -22,11 +22,11 @@ export default function IcebreakerPage() {
   // Templates State
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.0-flash-001');
+  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-3-flash-preview');
 
   const models = [
-      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 3 Flash Preview' },
-      { id: 'google/gemini-2.0-pro-exp-02-05:free', name: 'Gemini 3 Pro Preview' },
+      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
       { id: 'openai/gpt-5.2', name: 'GPT 5.2' },
       { id: 'openrouter/auto', name: 'OpenRouter Auto' },
   ];
