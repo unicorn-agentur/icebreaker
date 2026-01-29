@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle, Filter } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle, Filter, Cpu } from 'lucide-react';
 import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
@@ -22,6 +22,14 @@ export default function IcebreakerPage() {
   // Templates State
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.0-flash-001');
+
+  const models = [
+      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
+      { id: 'google/gemini-2.0-pro-exp-02-05:free', name: 'Gemini 2.0 Pro (Exp)' },
+      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
+      { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
+  ];
 
   // Bulk Processing State
   const [totalPending, setTotalPending] = useState(0);
@@ -90,7 +98,7 @@ export default function IcebreakerPage() {
     // if (templatesData) setTemplates(templatesData);
 
     // 2. Fetch Settings (Prompt & Last Template)
-    const { data: settings } = await supabase.from('settings').select('icebreaker_prompt, last_used_template_id').single();
+    const { data: settings } = await supabase.from('settings').select('icebreaker_prompt, last_used_template_id, selected_model').single();
     
     if (settings) {
         if (settings.icebreaker_prompt) {
@@ -98,6 +106,9 @@ export default function IcebreakerPage() {
         }
         if (settings.last_used_template_id) {
             setSelectedTemplateId(settings.last_used_template_id);
+        }
+        if (settings.selected_model) {
+            setSelectedModel(settings.selected_model);
         }
     } else {
         // Default Prompt if nothing saved
@@ -190,7 +201,10 @@ export default function IcebreakerPage() {
   };
 
   const saveSettings = async () => {
-    await supabase.from('settings').update({ icebreaker_prompt: prompt }).neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('settings').update({ 
+        icebreaker_prompt: prompt,
+        selected_model: selectedModel 
+    }).neq('id', '00000000-0000-0000-0000-000000000000');
   };
 
   // --- Template Logic ---
@@ -274,7 +288,7 @@ export default function IcebreakerPage() {
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead, prompt }),
+          body: JSON.stringify({ lead, prompt, model: selectedModel }),
         });
         
         const data = await response.json();
@@ -484,53 +498,72 @@ export default function IcebreakerPage() {
                 </div>
 
                 {/* Template Controls */}
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
+                <div className="space-y-3">
+                    {/* Model Selector */}
+                    <div className="relative">
+                        <div className="absolute left-3 top-2.5 pointer-events-none text-muted-foreground">
+                            <Cpu className="w-4 h-4" />
+                        </div>
                         <select 
-                            className="w-full h-10 pl-3 pr-8 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            onChange={(e) => handleTemplateChange(e.target.value)}
-                            value={selectedTemplateId}
+                            className="w-full h-10 pl-9 pr-3 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value)}
+                            disabled={bulkProcessing || generating}
                         >
-                            <option value="">-- Vorlage wählen --</option>
-                            {templates.map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
+                            {models.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
                             ))}
                         </select>
                     </div>
-                    
-                    {selectedTemplateId && (
+
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <select 
+                                className="w-full h-10 pl-3 pr-8 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                onChange={(e) => handleTemplateChange(e.target.value)}
+                                value={selectedTemplateId}
+                            >
+                                <option value="">-- Vorlage wählen --</option>
+                                {templates.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        {selectedTemplateId && (
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={handleOverwriteTemplate} 
+                                disabled={isSaving}
+                                title="Ausgewähltes Template überschreiben"
+                                className={isSaving ? "text-green-600 border-green-200 bg-green-50" : ""}
+                            >
+                                {isSaving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                            </Button>
+                        )}
+
                         <Button 
                             variant="outline" 
                             size="icon" 
-                            onClick={handleOverwriteTemplate} 
-                            disabled={isSaving}
-                            title="Ausgewähltes Template überschreiben"
-                            className={isSaving ? "text-green-600 border-green-200 bg-green-50" : ""}
+                            onClick={handleSaveNewTemplate} 
+                            title="Als NEUES Template speichern"
                         >
-                            {isSaving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                            <Plus className="w-4 h-4" />
                         </Button>
-                    )}
 
-                    <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={handleSaveNewTemplate} 
-                        title="Als NEUES Template speichern"
-                    >
-                        <Plus className="w-4 h-4" />
-                    </Button>
-
-                    {selectedTemplateId && (
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50" 
-                            onClick={handleDeleteTemplate}
-                            title="Vorlage löschen"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                    )}
+                        {selectedTemplateId && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-red-400 hover:text-red-600 hover:bg-red-50" 
+                                onClick={handleDeleteTemplate}
+                                title="Vorlage löschen"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
               </CardHeader>
 
@@ -688,7 +721,7 @@ export default function IcebreakerPage() {
                                         "{testResults[lead.id].icebreaker}"
                                     </div>
                                     <div className="mt-2 text-xs text-right text-muted-foreground">
-                                        Generiert mit Gemini 3.0 Flash
+                                        Generiert mit {models.find(m => m.id === selectedModel)?.name || selectedModel}
                                     </div>
                                 </div>
                             ) : (
