@@ -25,10 +25,10 @@ export default function IcebreakerPage() {
   const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.0-flash-001');
 
   const models = [
-      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-      { id: 'google/gemini-2.0-pro-exp-02-05:free', name: 'Gemini 2.0 Pro (Exp)' },
-      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-      { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
+      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 3 Flash Preview' },
+      { id: 'google/gemini-2.0-pro-exp-02-05:free', name: 'Gemini 3 Pro Preview' },
+      { id: 'openai/gpt-5.2', name: 'GPT 5.2' },
+      { id: 'openrouter/auto', name: 'OpenRouter Auto' },
   ];
 
   // Bulk Processing State
