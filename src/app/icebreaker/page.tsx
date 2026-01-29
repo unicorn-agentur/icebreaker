@@ -5,12 +5,11 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, LayoutTemplate } from 'lucide-react';
-import { Lead } from '@/types/database';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText } from 'lucide-react';
+import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { TemplateManager } from '@/components/TemplateManager';
 
 export default function IcebreakerPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -19,8 +18,11 @@ export default function IcebreakerPage() {
   const [generating, setGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, { summary: string; icebreaker: string }>>({});
-  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   
+  // Templates State
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
   // Bulk Processing State
   const [totalPending, setTotalPending] = useState(0);
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -38,15 +40,27 @@ export default function IcebreakerPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    // 1. Fetch Settings (Prompt) - load last used prompt as default
-    const { data: settings } = await supabase.from('settings').select('icebreaker_prompt').single();
-    if (settings?.icebreaker_prompt) {
-      setPrompt(settings.icebreaker_prompt);
+    
+    // 1. Load Templates first
+    const { data: templatesData } = await supabase.from('prompt_templates').select('*').order('created_at', { ascending: false });
+    if (templatesData) setTemplates(templatesData);
+
+    // 2. Fetch Settings (Prompt & Last Template)
+    const { data: settings } = await supabase.from('settings').select('icebreaker_prompt, last_used_template_id').single();
+    
+    if (settings) {
+        if (settings.icebreaker_prompt) {
+            setPrompt(settings.icebreaker_prompt);
+        }
+        if (settings.last_used_template_id) {
+            setSelectedTemplateId(settings.last_used_template_id);
+        }
     } else {
+        // Default Prompt if nothing saved
         setPrompt("Erstelle einen kurzen, charmanten Icebreaker für eine Cold Email an {{firstName}} von {{companyName}}. Beziehe dich auf ihre Website und erwähne etwas Spezifisches aus der Recherche. Halte es unter 30 Wörtern. Du bist Dennis von der Unicorn Agentur.");
     }
 
-    // 2. Fetch FIRST 3 Pending Leads (Ordered by creation)
+    // 3. Fetch FIRST 3 Pending Leads
     const { data: firstLeads } = await supabase
       .from('leads')
       .select('*')
@@ -61,7 +75,7 @@ export default function IcebreakerPage() {
       }
     }
 
-    // 3. Count total pending leads
+    // 4. Count total pending leads
     const { count } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
@@ -74,20 +88,77 @@ export default function IcebreakerPage() {
     setLoading(false);
   };
 
-  const savePrompt = async () => {
+  // --- Template Logic ---
+
+  const handleTemplateChange = async (templateId: string) => {
+      setSelectedTemplateId(templateId);
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+          setPrompt(template.content);
+          // Save selection to settings
+          await supabase.from('settings').update({ last_used_template_id: templateId }).neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+  };
+
+  const handleOverwriteTemplate = async () => {
+      if (!selectedTemplateId) return;
+      
+      setIsSaving(true);
+      const { error } = await supabase
+          .from('prompt_templates')
+          .update({ content: prompt })
+          .eq('id', selectedTemplateId);
+      
+      if (!error) {
+          // Update local state
+          setTemplates(prev => prev.map(t => t.id === selectedTemplateId ? { ...t, content: prompt } : t));
+          // Also save as current draft
+          await saveSettings();
+      }
+      setTimeout(() => setIsSaving(false), 1000);
+  };
+
+  const handleSaveNewTemplate = async () => {
+      const name = window.prompt("Name für das neue Template:");
+      if (!name) return;
+
+      setIsSaving(true);
+      const { data, error } = await supabase
+          .from('prompt_templates')
+          .insert({ name, content: prompt })
+          .select()
+          .single();
+
+      if (!error && data) {
+          setTemplates([data, ...templates]);
+          setSelectedTemplateId(data.id);
+          // Save as last used
+          await supabase.from('settings').update({ last_used_template_id: data.id }).neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+      setIsSaving(false);
+  };
+
+  const handleDeleteTemplate = async () => {
+      if (!selectedTemplateId || !confirm("Template wirklich löschen?")) return;
+
+      const { error } = await supabase.from('prompt_templates').delete().eq('id', selectedTemplateId);
+      if (!error) {
+          setTemplates(prev => prev.filter(t => t.id !== selectedTemplateId));
+          setSelectedTemplateId('');
+          await supabase.from('settings').update({ last_used_template_id: null }).neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+  };
+
+  const saveSettings = async () => {
     await supabase.from('settings').update({ icebreaker_prompt: prompt }).neq('id', '00000000-0000-0000-0000-000000000000');
   };
 
-  const handleSavePrompt = async () => {
-    setIsSaving(true);
-    await savePrompt();
-    setTimeout(() => setIsSaving(false), 1500);
-  };
+  // --- Processing Logic ---
 
   const runTest = async () => {
     setGenerating(true);
     setTestResults({});
-    await savePrompt();
+    await saveSettings();
 
     for (const lead of leads) {
       await processSingleLead(lead);
@@ -122,18 +193,15 @@ export default function IcebreakerPage() {
   };
 
   const startBulkProcessing = async () => {
-      // Removed confirmation dialog as requested
-      
       setBulkProcessing(true);
       setBulkProgress(0);
       setBulkProcessedCount(0);
       setBulkError(null);
-      await savePrompt();
+      await saveSettings();
 
       let processed = 0;
-      const batchSize = 5; // Process 5 at a time
+      const batchSize = 5; 
       const startTime = Date.now();
-      // Use the stored list name
       
       try {
           while (true) {
@@ -146,29 +214,26 @@ export default function IcebreakerPage() {
               if (error) throw error;
               if (!batch || batch.length === 0) break;
 
-              // Process batch in parallel
               await Promise.all(batch.map(lead => processSingleLead(lead)));
 
               processed += batch.length;
               setBulkProcessedCount(processed);
               setBulkProgress((processed / totalPending) * 100);
 
-              // Calculate estimated time remaining
               const elapsedTime = Date.now() - startTime;
               const msPerLead = elapsedTime / processed;
               const remainingLeads = totalPending - processed;
               const remainingMs = remainingLeads * msPerLead;
-              setEstimatedTimeRemaining(Math.ceil(remainingMs / 60000)); // in minutes
+              setEstimatedTimeRemaining(Math.ceil(remainingMs / 60000)); 
           }
 
-          // Automatically redirect to export page when done
           router.push(`/export?list=${encodeURIComponent(currentListName)}`);
 
       } catch (err: any) {
           console.error("Bulk Error", err);
           setBulkError(err.message || "Fehler beim Bulk-Processing");
           setBulkProcessing(false);
-          fetchData(); // Refresh list and counts
+          fetchData(); 
       }
   };
 
@@ -186,12 +251,6 @@ export default function IcebreakerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <TemplateManager 
-        isOpen={isTemplateManagerOpen} 
-        onClose={() => setIsTemplateManagerOpen(false)}
-        currentPrompt={prompt}
-        onLoadTemplate={(content) => setPrompt(content)}
-      />
       
       <main className="max-w-7xl mx-auto space-y-8">
         
@@ -217,7 +276,6 @@ export default function IcebreakerPage() {
           
           {/* Bulk Action Area */}
           <div className="flex items-center gap-4">
-               {/* Export Button if leads are ready */}
                {leads.some(l => l.status === 'generated') && !bulkProcessing && (
                    <Link href={`/export?list=${encodeURIComponent(currentListName)}`}>
                        <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
@@ -261,52 +319,83 @@ export default function IcebreakerPage() {
           
           {/* LEFT COLUMN: Prompt Editor (4 cols) */}
           <div className="xl:col-span-4 space-y-6">
-            <Card className="sticky top-6 shadow-md">
-              <CardHeader className="bg-gray-50/50 dark:bg-gray-800/50 border-b pb-4 flex flex-row items-center justify-between space-y-0">
-                <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Bot className="w-5 h-5 text-primary" /> 
-                        Prompt Editor
-                    </CardTitle>
-                    <CardDescription>
-                    Definiere, wie Gemini den Icebreaker schreiben soll.
-                    </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setIsTemplateManagerOpen(true)}
-                        className="gap-2"
-                    >
-                        <LayoutTemplate className="w-4 h-4" /> Vorlagen
-                    </Button>
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleSavePrompt} 
-                        title="Entwurf speichern"
-                        className={isSaving ? "text-green-600" : ""}
-                    >
-                        {isSaving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                    </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                <div className="relative">
-                    <textarea
-                    className="flex min-h-[300px] w-full rounded-xl border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono leading-relaxed"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Schreibe deinen Prompt hier..."
-                    disabled={bulkProcessing}
-                    />
-                    <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
-                        {prompt.length} Zeichen
+            <Card className="sticky top-6 shadow-md flex flex-col h-[calc(100vh-200px)]">
+              <CardHeader className="bg-gray-50/50 dark:bg-gray-800/50 border-b pb-4 space-y-4">
+                <div className="flex flex-row items-center justify-between">
+                    <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Bot className="w-5 h-5 text-primary" /> 
+                            Prompt Editor
+                        </CardTitle>
                     </div>
                 </div>
 
-                <div className="space-y-2">
+                {/* Template Controls */}
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <select 
+                            className="w-full h-10 pl-3 pr-8 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            onChange={(e) => handleTemplateChange(e.target.value)}
+                            value={selectedTemplateId}
+                        >
+                            <option value="">-- Vorlage wählen --</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {selectedTemplateId && (
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={handleOverwriteTemplate} 
+                            disabled={isSaving}
+                            title="Ausgewähltes Template überschreiben"
+                            className={isSaving ? "text-green-600 border-green-200 bg-green-50" : ""}
+                        >
+                            {isSaving ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                        </Button>
+                    )}
+
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={handleSaveNewTemplate} 
+                        title="Als NEUES Template speichern"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </Button>
+
+                    {selectedTemplateId && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50" 
+                            onClick={handleDeleteTemplate}
+                            title="Vorlage löschen"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    )}
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4 pt-6 flex-1 flex flex-col min-h-0">
+                <div className="relative flex-1">
+                    <textarea
+                        className="absolute inset-0 w-full h-full rounded-xl border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono leading-relaxed"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Schreibe deinen Prompt hier..."
+                        disabled={bulkProcessing}
+                    />
+                </div>
+                <div className="flex justify-end text-xs text-muted-foreground">
+                    {prompt.length} Zeichen
+                </div>
+
+                <div className="space-y-2 shrink-0">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                         <Variable className="w-3 h-3" /> Verfügbare Variablen
                     </label>
@@ -323,15 +412,12 @@ export default function IcebreakerPage() {
                             </button>
                         ))}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        * Die <strong>Website-Zusammenfassung</strong> von Perplexity wird automatisch als Kontext an Gemini übergeben.
-                    </p>
                 </div>
 
                 <Button 
                     onClick={runTest} 
                     disabled={generating || leads.length === 0 || bulkProcessing} 
-                    className="w-full bg-primary hover:bg-primary/90 text-white shadow-lg h-12 text-base font-semibold"
+                    className="w-full bg-primary hover:bg-primary/90 text-white shadow-lg h-12 text-base font-semibold shrink-0"
                 >
                   {generating ? (
                     <>
