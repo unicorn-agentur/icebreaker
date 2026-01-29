@@ -6,9 +6,11 @@ import { CsvUploader } from '@/components/CsvUploader';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, Database, Zap } from 'lucide-react';
+import { ArrowRight, Sparkles, Database, Zap, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StepNavigation } from '@/components/StepNavigation';
+
+import { ListManager } from '@/components/ListManager';
 
 export default function Home() {
   const [hasLeads, setHasLeads] = useState<boolean | null>(null);
@@ -45,10 +47,20 @@ export default function Home() {
 
         <StepNavigation />
 
+        {/* List Manager Section */}
+        {hasLeads && (
+             <section className="w-full">
+                <ListManager onListDeleted={checkLeads} />
+             </section>
+        )}
+
         {/* Main Action Area */}
         <section className="w-full">
              <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <div className="p-4 md:p-8">
+                    <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+                        <FileSpreadsheet className="w-5 h-5 text-primary" /> Neue Liste importieren
+                    </h2>
                     <CsvUploader onUploadComplete={checkLeads} />
                 </div>
              </div>

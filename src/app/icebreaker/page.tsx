@@ -155,7 +155,31 @@ export default function IcebreakerPage() {
           if (firstLeads && firstLeads.length > 0) {
             setLeads(firstLeads);
           } else {
-            setLeads([]);
+            // If no PENDING leads, try to fetch GENERATED leads for preview
+            // This fixes the issue where switching lists shows "no leads" if they are all done
+             let generatedQuery = supabase
+                .from('leads')
+                .select('*')
+                .eq('status', 'generated');
+             
+             if (selectedList) {
+                 generatedQuery = generatedQuery.eq('list_name', selectedList);
+             }
+
+             const { data: generatedLeads } = await generatedQuery.order('created_at', { ascending: true }).limit(3);
+             if (generatedLeads && generatedLeads.length > 0) {
+                 setLeads(generatedLeads);
+                 // Pre-fill test results for generated leads
+                 const results: Record<string, { summary: string; icebreaker: string }> = {};
+                 generatedLeads.forEach(l => {
+                     if (l.scrape_summary && l.icebreaker) {
+                         results[l.id] = { summary: l.scrape_summary, icebreaker: l.icebreaker };
+                     }
+                 });
+                 setTestResults(results);
+             } else {
+                 setLeads([]);
+             }
           }
       }
   };
