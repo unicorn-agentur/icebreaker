@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle, Filter, Cpu } from 'lucide-react';
+import { Sparkles, Play, RefreshCw, Database, Bot, Variable, Save, Check, Zap, AlertCircle, ChevronLeft, ArrowRight, Trash2, Plus, FileText, Shuffle, PauseCircle, Filter, Cpu, Wallet, Settings2 } from 'lucide-react';
 import { Lead, PromptTemplate } from '@/types/database';
 import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
@@ -395,33 +395,36 @@ export default function IcebreakerPage() {
         <StepNavigation />
 
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:justify-between md:items-center pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <header className="flex flex-col xl:flex-row xl:justify-between xl:items-center pb-8 border-b border-gray-200 dark:border-gray-800 gap-6">
           <div className="flex items-center gap-4">
             <Link href="/">
-                <Button variant="ghost" size="icon" className="rounded-full">
-                    <ChevronLeft className="w-5 h-5" />
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                    <ChevronLeft className="w-6 h-6" />
                 </Button>
             </Link>
             <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                <Sparkles className="text-primary w-8 h-8" /> Icebreaker Playground
+                    <div className="p-2 bg-primary/10 rounded-xl">
+                        <Sparkles className="text-primary w-6 h-6" />
+                    </div>
+                    Icebreaker Playground
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">
-                Teste deinen Prompt an den ersten 3 Leads deiner Liste.
+                <p className="text-gray-500 dark:text-gray-400 mt-1 ml-1">
+                    Optimiere deinen Prompt und generiere personalisierte Icebreaker.
                 </p>
             </div>
           </div>
           
-          {/* List Selector & Bulk Action Area */}
-          <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+          {/* Unified Action Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
                
                {/* List Selector */}
-               <div className="relative">
-                   <div className="absolute left-3 top-2.5 pointer-events-none text-muted-foreground">
+               <div className="relative min-w-[220px]">
+                   <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
                        <Filter className="w-4 h-4" />
                    </div>
                    <select 
-                       className="h-10 pl-9 pr-8 rounded-md border border-input bg-background text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-w-[200px]"
+                       className="w-full h-11 pl-9 pr-8 rounded-xl border-0 bg-gray-50 dark:bg-gray-800 text-sm font-medium focus:ring-2 focus:ring-primary/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors appearance-none"
                        value={selectedList}
                        onChange={(e) => {
                            setSelectedList(e.target.value);
@@ -434,64 +437,83 @@ export default function IcebreakerPage() {
                            <option key={list} value={list}>{list}</option>
                        ))}
                    </select>
+                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                       <Settings2 className="w-3 h-3" />
+                   </div>
                </div>
 
-               {leads.some(l => l.status === 'generated') && !bulkProcessing && (
-                   <Link href={`/export?list=${encodeURIComponent(selectedList)}`}>
-                       <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/5">
-                           Weiter zum Export <ArrowRight className="w-4 h-4 ml-2" />
-                       </Button>
-                   </Link>
-               )}
+               {/* Divider (Desktop) */}
+               <div className="hidden sm:block w-px h-8 bg-gray-200 dark:bg-gray-700 mx-1"></div>
 
-               {bulkProcessing ? (
-                   <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-3 rounded-lg border shadow-sm min-w-[300px]">
-                       <div className="flex-1 space-y-1">
-                           <div className="flex justify-between text-xs font-medium">
-                               <span>Verarbeite Leads... {estimatedTimeRemaining !== null && `(ca. ${estimatedTimeRemaining} Min.)`}</span>
-                               <span>{bulkProcessedCount} / {totalPending}</span>
+               {/* Dynamic Actions Area */}
+               <div className="flex-1 flex items-center justify-end gap-3 min-w-[300px]">
+                   {bulkProcessing ? (
+                       <div className="flex-1 flex items-center gap-3 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-xl border border-gray-100 dark:border-gray-700">
+                           <div className="flex-1 space-y-1">
+                               <div className="flex justify-between text-xs font-medium text-gray-700 dark:text-gray-300">
+                                   <span className="flex items-center gap-1.5">
+                                       <RefreshCw className="w-3 h-3 animate-spin text-primary" />
+                                       Verarbeite... {estimatedTimeRemaining !== null && `(~${estimatedTimeRemaining} Min.)`}
+                                   </span>
+                                   <span>{bulkProcessedCount} / {totalPending}</span>
+                               </div>
+                               <Progress value={bulkProgress} className="h-1.5" />
                            </div>
-                           <Progress value={bulkProgress} className="h-2" />
+                           <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               onClick={stopBulkProcessing}
+                               className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full ml-1"
+                               title="Pausieren"
+                           >
+                               <PauseCircle className="w-5 h-5" />
+                           </Button>
                        </div>
-                       <Button 
-                           variant="ghost" 
-                           size="icon" 
-                           onClick={stopBulkProcessing}
-                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                           title="Pausieren"
-                       >
-                           <PauseCircle className="w-5 h-5" />
-                       </Button>
-                   </div>
-               ) : (
-                   totalPending > 0 && (
-                        <div className="flex flex-col items-end gap-1">
-                             <div className="flex items-center gap-2">
-                                 <div className="text-sm text-right mr-2 hidden sm:block">
-                                    <div className="font-semibold">{totalPending} Leads</div>
-                                    <div className="text-muted-foreground text-xs">warten auf Generierung</div>
-                                 </div>
-                                 <Button 
-                                    onClick={startBulkProcessing}
-                                    disabled={generating}
-                                    className="bg-primary hover:bg-primary/90 text-white shadow-lg border-0"
-                                >
-                                    <Zap className="w-4 h-4 mr-2 fill-white text-white" />
-                                    Alle Generieren
-                                </Button>
-                             </div>
-                             
-                             {/* Cost Estimation */}
-                             <div className="text-[10px] text-muted-foreground flex items-center gap-1 bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded border border-gray-100 dark:border-gray-700">
-                                <span>Schätzung: ~${((SEARCH_COST_PER_LEAD + (models.find(m => m.id === selectedModel)?.costPerLead || 0)) * totalPending).toFixed(2)}</span>
-                                <span className="mx-1">•</span>
-                                <a href="https://openrouter.ai/credits" target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-0.5">
-                                    Credits aufladen <ArrowRight className="w-2 h-2" />
-                                </a>
-                             </div>
-                        </div>
-                   )
-               )}
+                   ) : (
+                       <>
+                           {/* Stats & Cost (only if pending > 0) */}
+                           {totalPending > 0 && (
+                                <div className="flex flex-col items-end mr-1">
+                                    <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                        {totalPending} <span className="text-muted-foreground font-normal text-xs">Leads offen</span>
+                                    </div>
+                                    
+                                    <a 
+                                        href="https://openrouter.ai/credits" 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="group flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-full border border-gray-100 dark:border-gray-700 mt-0.5"
+                                        title="Geschätzte Kosten basierend auf Modell + Suche"
+                                    >
+                                        <Wallet className="w-3 h-3 group-hover:text-primary" />
+                                        <span>~${((SEARCH_COST_PER_LEAD + (models.find(m => m.id === selectedModel)?.costPerLead || 0)) * totalPending).toFixed(2)}</span>
+                                    </a>
+                                </div>
+                           )}
+
+                           <div className="flex gap-2">
+                               {leads.some(l => l.status === 'generated') && (
+                                   <Link href={`/export?list=${encodeURIComponent(selectedList)}`}>
+                                       <Button variant="outline" className="h-11 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                           Export <ArrowRight className="w-4 h-4 ml-2" />
+                                       </Button>
+                                   </Link>
+                               )}
+
+                               {totalPending > 0 && (
+                                    <Button 
+                                        onClick={startBulkProcessing}
+                                        disabled={generating}
+                                        className="h-11 bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all px-6"
+                                    >
+                                        <Zap className="w-4 h-4 mr-2 fill-white text-white" />
+                                        Alle Generieren
+                                    </Button>
+                               )}
+                           </div>
+                       </>
+                   )}
+               </div>
           </div>
         </header>
 
