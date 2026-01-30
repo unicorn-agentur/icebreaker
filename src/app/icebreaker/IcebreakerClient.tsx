@@ -29,13 +29,44 @@ export default function IcebreakerClient() {
   const [selectedModel, setSelectedModel] = useState<string>('google/gemini-3-flash-preview');
 
   const models = [
-      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', costPerLead: 0.0007 },
-      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', costPerLead: 0.0032 },
-      { id: 'openai/gpt-5.2', name: 'GPT 5.2', costPerLead: 0.00315 },
-      { id: 'openrouter/auto', name: 'OpenRouter Auto', costPerLead: 0.002 }, // Estimate
+      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', costPerLead: 0.0007, inputPrice: 0.0005, outputPrice: 0.003 }, // $0.50/M input, $3/M output
+      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', costPerLead: 0.0032, inputPrice: 0.002, outputPrice: 0.012 }, // $2/M input, $12/M output
+      { id: 'openai/gpt-5.2', name: 'GPT 5.2', costPerLead: 0.00315, inputPrice: 0.00175, outputPrice: 0.014 }, // $1.75/M input, $14/M output
+      { id: 'openrouter/auto', name: 'OpenRouter Auto', costPerLead: 0.002, inputPrice: 0.001, outputPrice: 0.005 }, // Estimate
   ];
 
-  const SEARCH_COST_PER_LEAD = 0.0055; // Perplexity Sonar estimate
+  const SEARCH_COST_PER_LEAD = 0.0055; // Perplexity Sonar estimate ($5/K reqs = $0.005/req + tokens)
+
+  // Helper to estimate tokens (rough approximation: 1 token ~= 4 chars)
+  const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+  // Calculate estimated cost
+  const calculateEstimatedCost = () => {
+      if (totalPending === 0) return "0.00";
+      
+      const selectedModelData = models.find(m => m.id === selectedModel);
+      if (!selectedModelData) return "0.00";
+
+      // 1. Search Cost (fixed per lead)
+      const searchCost = SEARCH_COST_PER_LEAD * totalPending;
+
+      // 2. Generation Cost
+      // Estimate input tokens: Prompt length + Scraped content estimate (avg 500 words / 2000 chars)
+      const estimatedPromptTokens = estimateTokens(prompt);
+      const estimatedScrapedContentTokens = 800; // Conservative average for scraped content
+      const totalInputTokensPerLead = estimatedPromptTokens + estimatedScrapedContentTokens;
+      
+      // Estimate output tokens: Icebreaker length (avg 50 words / 300 chars)
+      const estimatedOutputTokensPerLead = 100; 
+
+      const generationCostPerLead = 
+          (totalInputTokensPerLead / 1000000 * selectedModelData.inputPrice) + 
+          (estimatedOutputTokensPerLead / 1000000 * selectedModelData.outputPrice);
+
+      const generationCost = generationCostPerLead * totalPending;
+
+      return (searchCost + generationCost).toFixed(2);
+  };
 
   // Bulk Processing State
   const [totalPending, setTotalPending] = useState(0);
@@ -492,10 +523,10 @@ export default function IcebreakerClient() {
                                         target="_blank" 
                                         rel="noreferrer"
                                         className="group flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-full border border-gray-100 dark:border-gray-700 mt-0.5"
-                                        title="Geschätzte Kosten basierend auf Modell + Suche"
+                                        title="Geschätzte Kosten basierend auf Modell + Suche + Prompt-Länge"
                                     >
                                         <Wallet className="w-3 h-3 group-hover:text-primary" />
-                                        <span>~${((SEARCH_COST_PER_LEAD + (models.find(m => m.id === selectedModel)?.costPerLead || 0)) * totalPending).toFixed(2)}</span>
+                                        <span>~${calculateEstimatedCost()}</span>
                                     </a>
                                 </div>
                            )}
