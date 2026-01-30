@@ -11,69 +11,43 @@ import { StepNavigation } from '@/components/StepNavigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { useSearchParams } from 'next/navigation';
+
+// ...
+
 export default function IcebreakerPage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [testResults, setTestResults] = useState<Record<string, { summary: string; icebreaker: string }>>({});
+  const searchParams = useSearchParams();
+  const listParam = searchParams.get('list');
+  // ...
   
-  // Templates State
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-3-flash-preview');
-
-  const models = [
-      { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', costPerLead: 0.0007 },
-      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', costPerLead: 0.0032 },
-      { id: 'openai/gpt-5.2', name: 'GPT 5.2', costPerLead: 0.00315 },
-      { id: 'openrouter/auto', name: 'OpenRouter Auto', costPerLead: 0.002 }, // Estimate
-  ];
-
-  const SEARCH_COST_PER_LEAD = 0.0055; // Perplexity Sonar estimate
-
-  // Bulk Processing State
-  const [totalPending, setTotalPending] = useState(0);
-  const [bulkProcessing, setBulkProcessing] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
-  const [bulkProcessedCount, setBulkProcessedCount] = useState(0);
-  const [bulkError, setBulkError] = useState<string | null>(null);
-  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
-  const shouldStopRef = useRef(false);
-  const router = useRouter();
-
-  const [availableLists, setAvailableLists] = useState<string[]>([]);
+  // ...
   const [selectedList, setSelectedList] = useState<string>('');
-  const [currentListName, setCurrentListName] = useState<string>('');
+  // ...
 
   useEffect(() => {
+    // If URL param exists, set it immediately
+    if (listParam) {
+        setSelectedList(listParam);
+        setCurrentListName(listParam);
+    }
+    
     fetchLists().then(() => {
         fetchTemplates();
     });
-  }, []);
+  }, [listParam]); // Add listParam dependency
 
-  useEffect(() => {
-      if (selectedList) {
-          fetchData();
-      }
-  }, [selectedList]);
+  // ...
 
   const fetchLists = async () => {
-      // Fetch distinct list names. 
-      // Note: For large datasets, this should be an RPC or optimized query. 
-      // For now, we fetch list_name column and dedupe client-side.
-      const { data } = await supabase
-          .from('leads')
-          .select('list_name')
-          .not('list_name', 'is', null);
+      // ... (fetch logic)
       
       if (data) {
           const uniqueLists = Array.from(new Set(data.map(l => l.list_name).filter(Boolean))) as string[];
           setAvailableLists(uniqueLists);
           
-          // Default to most recent list if not set
-          if (!selectedList && uniqueLists.length > 0) {
+          // Only default if NO list is selected (and no URL param was present)
+          if (!selectedList && !listParam && uniqueLists.length > 0) {
+               // ... (default to recent logic)
                const { data: recent } = await supabase
                   .from('leads')
                   .select('list_name')
